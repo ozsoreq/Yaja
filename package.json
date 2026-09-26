@@ -1,0 +1,12 @@
+{
+  "name": "yaja",
+  "version": "1.0.0",
+  "description": "YAJA — a competitive hex board game with a League-style ranked ladder. Static HTML, no build step.",
+  "private": true,
+  "scripts": {
+    "start": "npx http-server -p 8080 -c-1 .",
+    "test": "node --test tests/*.test.js",
+    "sim": "node tools/balance.js"
+  },
+  "license": "MIT"
+}

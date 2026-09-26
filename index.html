@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>YAJA · Hex Arena</title>
+<meta name="description" content="YAJA is a fast competitive hex board game. Draft a champion, flip the board, climb from Iron to Challenger.">
+<meta name="theme-color" content="#070a14">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,4 90,27 90,73 50,96 10,73 10,27' fill='%230b1426' stroke='%23c8aa6e' stroke-width='6'/%3E%3Cpolygon points='50,28 70,40 70,62 50,74 30,62 30,40' fill='%233ab0ff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Cinzel:wght@600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="bg-layer" aria-hidden="true"><div class="bg-glow a"></div><div class="bg-glow b"></div><div class="bg-hex"></div></div>
+
+<div id="app">
+  <!-- Top bar -->
+  <header class="topbar" id="topbar">
+    <button class="logo" data-go="home" aria-label="YAJA home">
+      <svg viewBox="0 0 100 100" width="34" height="34" aria-hidden="true"><polygon points="50,4 90,27 90,73 50,96 10,73 10,27" fill="#0b1426" stroke="#c8aa6e" stroke-width="6"/><polygon points="50,28 70,40 70,62 50,74 30,62 30,40" fill="#3ab0ff"/><polygon points="50,28 70,40 50,51 30,40" fill="#ff3b5c"/></svg>
+      <span>YAJA</span>
+    </button>
+    <nav class="nav" id="nav">
+      <button data-go="home" class="active">Play</button>
+      <button data-go="profile">Profile</button>
+      <button data-go="ladder">Ladder</button>
+      <button data-go="collection">Collection</button>
+      <button data-go="learn">How to play</button>
+    </nav>
+    <div class="topbar-right">
+      <div class="essence" title="Essence — earn it by playing, spend it in Collection"><span class="ess-icon"></span><b id="essence">0</b></div>
+      <button class="icon-btn" id="soundBtn" aria-label="Toggle sound"></button>
+      <button class="me-chip" data-go="profile" id="meChip"></button>
+    </div>
+  </header>
+
+  <main id="screens">
+    <!-- HOME -->
+    <section class="screen" id="screen-home">
+      <div class="home-grid">
+        <div class="panel rank-card" id="rankCard"></div>
+        <div class="play-col">
+          <div class="modes" id="modes">
+            <button class="mode-card active" data-mode="ranked">
+              <span class="mode-kicker">Ranked · vs AI rivals</span>
+              <span class="mode-title">Ranked</span>
+              <span class="mode-sub">Climb Iron → Challenger against a cast of 20 rival bots</span>
+            </button>
+            <button class="mode-card" data-mode="online">
+              <span class="mode-kicker">Real players · WebRTC</span>
+              <span class="mode-title">Online Duel</span>
+              <span class="mode-sub">Quick match or a private room with a friend</span>
+            </button>
+            <button class="mode-card" data-mode="practice">
+              <span class="mode-kicker">No LP on the line</span>
+              <span class="mode-title">Practice</span>
+              <span class="mode-sub">Pick your opponent's difficulty</span>
+            </button>
+          </div>
+          <div class="mode-detail" id="modeDetail"></div>
+          <button class="play-btn" id="playBtn"><span class="play-label">Find match</span><span class="play-sub" id="playSub"></span></button>
+          <div class="history-strip" id="historyStrip"></div>
+        </div>
+        <div class="side-col">
+          <div class="panel" id="questPanel"></div>
+          <div class="panel puzzle-card" id="puzzleCard"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHAMP SELECT -->
+    <section class="screen" id="screen-select">
+      <div class="select-head">
+        <div class="select-title"><span class="kicker" id="selectKicker">Ranked</span><h1>Choose your champion</h1></div>
+        <div class="select-timer"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" class="t-bg"/><circle cx="22" cy="22" r="19" class="t-fg" id="selectRing"/></svg><b id="selectTime">20</b></div>
+        <div class="select-opp" id="selectOpp"></div>
+      </div>
+      <div class="champ-grid" id="champGrid"></div>
+      <div class="select-foot"><button class="btn gold big" id="lockBtn" disabled>Lock in</button></div>
+    </section>
+
+    <!-- VS -->
+    <section class="screen" id="screen-vs"><div class="vs" id="vsBox"></div></section>
+
+    <!-- GAME -->
+    <section class="screen" id="screen-game">
+      <div class="game">
+        <div class="adv-wrap"><div class="adv-bar" id="advBar"><div class="adv-fill" id="advFill"></div><div class="adv-mid"></div></div><div class="phase-tag" id="phaseTag"></div></div>
+        <aside class="pp left" id="ppLeft"></aside>
+        <div class="board-host" id="boardHost"></div>
+        <aside class="pp right" id="ppRight"></aside>
+        <div class="game-foot">
+          <div class="emotes" id="emotes"></div>
+          <div class="turn-banner" id="turnBanner"></div>
+          <button class="btn ghost small" id="resignBtn">Surrender</button>
+        </div>
+        <div class="callout" id="callout"></div>
+      </div>
+    </section>
+
+    <!-- PROFILE / LADDER / COLLECTION / LEARN / ONLINE / REVIEW / PUZZLE -->
+    <section class="screen scroll" id="screen-profile"></section>
+    <section class="screen scroll" id="screen-ladder"></section>
+    <section class="screen scroll" id="screen-collection"></section>
+    <section class="screen scroll" id="screen-learn"></section>
+    <section class="screen scroll" id="screen-review"></section>
+    <section class="screen scroll" id="screen-puzzle"></section>
+  </main>
+
+  <!-- Overlays -->
+  <div class="overlay" id="queueOverlay"></div>
+  <div class="overlay" id="resultOverlay"></div>
+  <div class="overlay ceremony" id="ceremony"></div>
+  <div class="overlay" id="modal"></div>
+  <div class="toasts" id="toasts"></div>
+</div>
+
+<script src="vendor/peerjs.min.js" defer></script>
+<script src="js/engine.js" defer></script>
+<script src="js/ai.js" defer></script>
+<script src="js/rank.js" defer></script>
+<script src="js/audio.js" defer></script>
+<script src="js/art.js" defer></script>
+<script src="js/board.js" defer></script>
+<script src="js/net.js" defer></script>
+<script src="js/match.js" defer></script>
+<script src="js/app.js" defer></script>
+</body>
+</html>
