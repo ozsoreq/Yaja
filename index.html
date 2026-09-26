@@ -87,16 +87,17 @@
     <!-- GAME -->
     <section class="screen" id="screen-game">
       <div class="game">
-        <div class="adv-wrap"><div class="adv-bar" id="advBar"><div class="adv-fill" id="advFill"></div><div class="adv-mid"></div></div><div class="phase-tag" id="phaseTag"></div></div>
+        <div class="adv-wrap"><span class="adv-label">Advantage</span><div class="adv-bar" id="advBar"><div class="adv-fill" id="advFill"></div><div class="adv-mid"></div></div><div class="phase-tag" id="phaseTag"></div></div>
         <aside class="pp left" id="ppLeft"></aside>
         <div class="board-host" id="boardHost"></div>
         <aside class="pp right" id="ppRight"></aside>
         <div class="game-foot">
           <div class="emotes" id="emotes"></div>
           <div class="turn-banner" id="turnBanner"></div>
-          <button class="btn ghost small" id="resignBtn">Surrender</button>
+          <button class="btn ghost small" id="resignBtn" title="Surrender"><span aria-hidden="true">⚑</span><span class="rs-txt"> Surrender</span></button>
         </div>
         <div class="callout" id="callout"></div>
+        <div class="coach" id="coach" role="status"></div>
       </div>
     </section>
 

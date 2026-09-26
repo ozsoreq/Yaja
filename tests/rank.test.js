@@ -116,7 +116,26 @@ test('opponent picks are near your MMR', () => {
 
 test('season math is stable', () => {
   const a = R.seasonInfo(Date.UTC(2026, 0, 5));
-  const b = R.seasonInfo(Date.UTC(2026, 0, 19));
+  const b = R.seasonInfo(Date.UTC(2026, 1, 2)); // four-week splits
   assert.strictEqual(a.n, 1);
   assert.strictEqual(b.n, 2);
+});
+
+test('next goal guides the player', () => {
+  const p = R.freshProfile();
+  assert.match(R.nextGoal(p).text, /placement/);
+  p.rank = { tier: 3, div: 2, lp: 60 }; p.placementsLeft = 0; p.mmr = R.rankMMR(p.rank);
+  assert.match(R.nextGoal(p).text, /win.* to Gold I/);
+  p.rank.div = 1; p.ascension = true;
+  assert.match(R.nextGoal(p).text, /Ascension match to reach Platinum IV/);
+});
+
+test('nemesis revenge adds LP; ascension brings a gatekeeper', () => {
+  const p = R.freshProfile();
+  p.placementsLeft = 0; p.games = 50; p.mmr = 2100; p.rank = { tier: 3, div: 2, lp: 10 };
+  const a = R.applyRanked(Object.assign({}, p, { rank: Object.assign({}, p.rank) }), 1, 2100, {});
+  const b = R.applyRanked(p, 1, 2100, { nemesis: true });
+  assert.strictEqual(b.gain, a.gain + 5);
+  p.ascension = true;
+  assert.ok(R.pickOpponent(p).gatekeeper);
 });

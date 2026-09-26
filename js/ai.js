@@ -78,15 +78,15 @@
 
   // Rating scale matches the ladder: Iron IV ≈ 800 … Diamond I ≈ 3500, Challenger ≈ 4100+.
   function profileFor(rating, style) {
-    var t = Math.max(0, Math.min(1, (rating - 800) / 3200));
+    var t = Math.max(0, Math.min(1, (rating - 800) / 3400));
     return {
-      depth: t < 0.12 ? 1 : t < 0.4 ? 2 : t < 0.78 ? 3 : 4,
-      noise: 16 * Math.pow(1 - t, 2),          // eval noise → positional mistakes at low ranks
-      blunder: 0.22 * Math.pow(1 - t, 3),      // chance to play a random legal move
+      depth: t < 0.1 ? 1 : t < 0.3 ? 2 : t < 0.58 ? 3 : t < 0.9 ? 4 : 5,
+      noise: 24 * Math.pow(1 - t, 1.6),        // eval noise → positional mistakes at low ranks
+      blunder: 0.3 * Math.pow(1 - t, 2.2),     // chance to play a random legal move
       ultCap: t < 0.3 ? 2 : 5,
       ultShy: t < 0.25 ? 0.5 : 0,              // low bots sometimes forget their ult
-      endgame: t >= 0.8 ? 9 : t >= 0.55 ? 6 : 0, // exact-ish search when this few hexes remain
-      budget: 5000 + 40000 * t,
+      endgame: t >= 0.85 ? 10 : t >= 0.6 ? 7 : t >= 0.4 ? 4 : 0, // exact-ish search when this few hexes remain
+      budget: 5000 + 60000 * t,
       style: style || DEFAULT_STYLE
     };
   }

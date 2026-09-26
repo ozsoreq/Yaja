@@ -48,9 +48,9 @@
   function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
   function expected(a, b) { return 1 / (1 + Math.pow(10, (b - a) / 400)); }
 
-  // ---- Seasons: two-week splits computed from the calendar -------------------
+  // ---- Seasons: four-week splits computed from the calendar -------------------
   var SEASON_EPOCH = Date.UTC(2026, 0, 5); // a Monday
-  var SPLIT_MS = 14 * 864e5;
+  var SPLIT_MS = 28 * 864e5;
   function seasonInfo(now) {
     now = now || Date.now();
     var n = Math.floor((now - SEASON_EPOCH) / SPLIT_MS) + 1;
@@ -141,7 +141,10 @@
     { id: 'title-flip',   kind: 'title', name: 'Flip Artist',    price: 150 },
     { id: 'title-tact',   kind: 'title', name: 'Tactician',      price: 300 },
     { id: 'title-menace', kind: 'title', name: 'Board Menace',   price: 450 },
-    { id: 'title-hex',    kind: 'title', name: 'Hexlord',        price: 900 }
+    { id: 'title-hex',    kind: 'title', name: 'Hexlord',        price: 900 },
+    { id: 'title-rune',   kind: 'title', name: 'Rune Warden',    price: 1200 },
+    { id: 'title-hexa',   kind: 'title', name: 'Hexaflip Legend', price: 2000 },
+    { id: 'title-unflip', kind: 'title', name: 'The Unflippable', price: 3500 }
   ];
 
   // ---- Profile persistence -----------------------------------------------------
@@ -166,7 +169,7 @@
   function freshProfile() {
     return {
       v: 1, name: randomName(), avatar: Math.floor(Math.random() * 6), created: Date.now(),
-      mmr: START_MMR, rank: null, placementsLeft: PLACEMENTS, placementWins: 0,
+      mmr: START_MMR, rank: null, placementsLeft: PLACEMENTS, placementsTotal: PLACEMENTS, placementWins: 0,
       games: 0, wins: 0, losses: 0, draws: 0, streak: 0, bestStreak: 0,
       ascension: false, promoShield: 0,
       season: seasonInfo().n, peak: null, pastSeasons: [],
@@ -176,20 +179,26 @@
       botRatings: {}, h2h: {},
       duel: { rating: 1200, games: 0, wins: 0 },
       puzzle: { day: null, done: false, tries: [], streak: 0, lastSolvedDay: null, best: 0 },
-      settings: { sound: true, fast: false }, tutorialSeen: false
+      settings: { sound: true, fast: false }, tutorialSeen: false, tutorialDone: false,
+      activeMatch: null, notices: []
     };
   }
   function migrate(p) {
     var f = freshProfile();
     for (var k in f) if (p[k] === undefined) p[k] = f[k];
-    // New season → soft reset.
+    // New split → rewards for your peak, then a gentle soft reset.
     var s = seasonInfo().n;
     if (p.season !== s) {
-      if (p.rank) p.pastSeasons.push({ season: p.season, peak: p.peak, final: p.rank });
+      if (p.rank || p.peak) {
+        var reward = p.peak ? 100 + p.peak.tier * 75 : 0;
+        p.pastSeasons.push({ season: p.season, peak: p.peak, final: p.rank });
+        if (reward) { p.essence += reward; p.notices.push('Split ' + p.season + ' ended. Peak ' + rankName(p.peak) + ' earned you <b>+' + reward + ' Essence</b> and a ' + TIERS[p.peak.tier].name + ' border.'); }
+      }
       p.season = s;
-      p.mmr = Math.round((p.mmr + START_MMR) / 2);
-      p.rank = null; p.placementsLeft = 3; p.placementWins = 0; p.peak = null; p.ascension = false;
+      p.mmr = Math.round(p.mmr * 0.75 + START_MMR * 0.25);
+      p.rank = null; p.placementsLeft = 3; p.placementsTotal = 3; p.placementWins = 0; p.peak = null; p.ascension = false;
     }
+    if (!p.placementsTotal) p.placementsTotal = PLACEMENTS;
     ensureQuests(p);
     return p;
   }
@@ -229,19 +238,44 @@
     var r = p.botRatings[bot.id];
     return r == null ? bot.home : r;
   }
+  function isNemesis(p, botId) { var h = p.h2h[botId]; return !!h && h.l - h.w >= 3; }
   function pickOpponent(p) {
     var target = p.mmr;
-    if (p.rank === null && p.placementsLeft === PLACEMENTS) target -= 250; // gentle first placement
+    if (p.rank === null && p.placementsLeft === PLACEMENTS && p.games === 0) target -= 250; // gentle first placement
     var ranked = BOTS.map(function (b) { return { bot: b, rating: botRating(p, b) }; })
       .sort(function (a, b) { return Math.abs(a.rating - target) - Math.abs(b.rating - target); });
+    var choice;
+    if (p.ascension) {
+      // The tier gate is guarded by the nearest rival rated at or above you.
+      choice = ranked.filter(function (x) { return x.rating >= target - 50; })[0] || ranked[0];
+      var gr = Math.round(Math.max(choice.rating, target) * 0.5 + target * 0.5 + 40);
+      return { bot: choice.bot, rating: gr, displayRank: rankFromMMR(choice.rating), gatekeeper: true, nemesis: isNemesis(p, choice.bot.id) };
+    }
     // Choose among the 3 nearest so you meet a small cast of recurring rivals.
-    var pickFrom = ranked.slice(0, 3);
-    var w = pickFrom.map(function (x, i) { return [0.5, 0.3, 0.2][i]; });
-    var roll = Math.random(), acc = 0, choice = pickFrom[0];
+    var pickFrom = ranked.slice(0, 3), w = [0.5, 0.3, 0.2];
+    var roll = Math.random(), acc = 0;
+    choice = pickFrom[0];
     for (var i = 0; i < pickFrom.length; i++) { acc += w[i]; if (roll <= acc) { choice = pickFrom[i]; break; } }
     // The bot plays near your level (never adapts to your streak).
     var playRating = Math.round(choice.rating * 0.5 + target * 0.5 + (Math.random() - 0.5) * 80);
-    return { bot: choice.bot, rating: playRating, displayRank: rankFromMMR(choice.rating) };
+    return { bot: choice.bot, rating: playRating, displayRank: rankFromMMR(choice.rating), nemesis: isNemesis(p, choice.bot.id) };
+  }
+
+  // What's the next thing to chase? Used by the lobby and the results screen.
+  function nextGoal(p) {
+    if (!p.rank) return { text: p.placementsLeft + ' placement game' + (p.placementsLeft === 1 ? '' : 's') + ' until your rank is revealed', wins: p.placementsLeft };
+    var r = p.rank;
+    if (p.ascension) return { text: 'Win your Ascension match to reach ' + TIERS[r.tier + 1].name + (r.tier + 1 >= APEX ? '' : ' IV'), wins: 1 };
+    var gain = Math.round(clamp(20 + (p.mmr - rankMMR(r)) / 25, 12, 30));
+    if (r.tier >= APEX) {
+      var nxt = r.tier === 7 ? GM_LP : r.tier === 8 ? CHALL_LP : null;
+      if (!nxt) return { text: 'Defend the Challenger throne', wins: 0 };
+      var w2 = Math.max(1, Math.ceil((nxt - r.lp) / gain));
+      return { text: '\u2248' + w2 + ' win' + (w2 > 1 ? 's' : '') + ' to ' + TIERS[r.tier + 1].name, wins: w2 };
+    }
+    var w = Math.max(1, Math.ceil((100 - r.lp) / gain));
+    var dest = r.div > 1 ? TIERS[r.tier].name + ' ' + DIV_NAMES[r.div - 1] : 'your ' + TIERS[r.tier + 1].name + ' Ascension match';
+    return { text: '\u2248' + w + ' win' + (w > 1 ? 's' : '') + ' to ' + dest, wins: w };
   }
 
   // ---- The heart: apply a ranked result ---------------------------------------------
@@ -285,6 +319,7 @@
     var gain = Math.round(clamp(20 + gap, 12, 30));
     var loss = Math.round(clamp(20 - gap, 10, 28));
     if (result === 1 && p.streak >= 3) { gain += 2; out.hotStreak = true; }
+    if (result === 1 && match && match.nemesis) { gain += 5; out.revenge = true; }
     out.gain = gain; out.loss = loss;
 
     if (result === 1) {
@@ -402,8 +437,10 @@
     p.history.unshift({
       t: Date.now(), mode: m.mode, won: m.won, draw: m.draw, champ: m.champ, oppChamp: m.oppChamp, opp: m.oppName,
       score: m.score, lp: out.ranked ? out.ranked.lpDelta : null, rank: p.rank ? Object.assign({}, p.rank) : null,
-      accuracy: m.accuracy == null ? null : m.accuracy, placement: out.ranked && !out.ranked.before && !p.rank
+      accuracy: m.accuracy == null ? null : m.accuracy, placement: !!(out.ranked && !out.ranked.before)
     });
+    if (out.ranked && !out.ranked.before) p.history[0].lp = null;
+    p.activeMatch = null;
     if (p.history.length > 40) p.history.length = 40;
     save(p);
     return out;
@@ -426,7 +463,7 @@
     dayKey: dayKey, dayNumber: dayNumber, rng: rng, hash: hash,
     load: load, save: save, freshProfile: freshProfile, ensureQuests: ensureQuests, questText: questText, rerollQuest: rerollQuest,
     pickOpponent: pickOpponent, applyRanked: applyRanked, recordMatch: recordMatch, ladder: ladder,
-    masteryLevel: masteryLevel, masteryProgress: masteryProgress, botRating: botRating, expected: expected
+    masteryLevel: masteryLevel, nextGoal: nextGoal, isNemesis: isNemesis, masteryProgress: masteryProgress, botRating: botRating, expected: expected
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Rank;
   root.YAJA = root.YAJA || {};

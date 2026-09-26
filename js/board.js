@@ -71,6 +71,39 @@
     };
   })();
 
+  // One shared, always-rendered <defs> for every board (duplicate ids inside hidden
+  // screens made stones render hollow).
+  function defsMarkup() {
+    return [
+      // Gem skin
+      '<radialGradient id="gem-1" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#d9f2ff"/><stop offset=".35" stop-color="#3ab0ff"/><stop offset="1" stop-color="#0b3a73"/></radialGradient>',
+      '<radialGradient id="gem-2" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffe0e6"/><stop offset=".35" stop-color="#ff3b5c"/><stop offset="1" stop-color="#6b0a1d"/></radialGradient>',
+      // Neon
+      '<radialGradient id="neon-1" cx=".5" cy=".5" r=".5"><stop offset=".55" stop-color="#021a2e"/><stop offset=".8" stop-color="#3ab0ff"/><stop offset="1" stop-color="#b6e6ff"/></radialGradient>',
+      '<radialGradient id="neon-2" cx=".5" cy=".5" r=".5"><stop offset=".55" stop-color="#2e0210"/><stop offset=".8" stop-color="#ff3b5c"/><stop offset="1" stop-color="#ffc2cd"/></radialGradient>',
+      // Glass
+      '<linearGradient id="glass-1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9bd8ff" stop-opacity=".95"/><stop offset=".5" stop-color="#1b5d9c" stop-opacity=".85"/><stop offset="1" stop-color="#031a33"/></linearGradient>',
+      '<linearGradient id="glass-2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb3c0" stop-opacity=".95"/><stop offset=".5" stop-color="#9c1b34" stop-opacity=".85"/><stop offset="1" stop-color="#33030d"/></linearGradient>',
+      // Gold
+      '<radialGradient id="gold-1" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="#fff6d8"/><stop offset=".3" stop-color="#64c3ff"/><stop offset=".85" stop-color="#0d3f78"/><stop offset="1" stop-color="#c8aa6e"/></radialGradient>',
+      '<radialGradient id="gold-2" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="#fff6d8"/><stop offset=".3" stop-color="#ff6680"/><stop offset=".85" stop-color="#78102a"/><stop offset="1" stop-color="#c8aa6e"/></radialGradient>',
+      // Plasma
+      '<radialGradient id="plasma-1" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff"/><stop offset=".25" stop-color="#8fe3ff"/><stop offset=".7" stop-color="#1a6fff"/><stop offset="1" stop-color="#1a6fff" stop-opacity=".2"/></radialGradient>',
+      '<radialGradient id="plasma-2" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff"/><stop offset=".25" stop-color="#ffb0c0"/><stop offset=".7" stop-color="#ff1f4b"/><stop offset="1" stop-color="#ff1f4b" stop-opacity=".2"/></radialGradient>',
+      '<radialGradient id="tile-g" cx=".5" cy=".35" r=".75"><stop offset="0" stop-color="var(--tile-hi)"/><stop offset="1" stop-color="var(--tile-lo)"/></radialGradient>',
+      '<filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+    ].join('');
+  }
+  function ensureDefs() {
+    if (document.getElementById('yaja-defs')) return;
+    var holder = document.createElementNS(NS, 'svg');
+    holder.setAttribute('id', 'yaja-defs');
+    holder.setAttribute('aria-hidden', 'true');
+    holder.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none');
+    holder.innerHTML = '<defs>' + defsMarkup() + '</defs>';
+    document.body.insertBefore(holder, document.body.firstChild);
+  }
+
   // ---- Board view ------------------------------------------------------------------------
   function BoardView(host, handlers) {
     this.host = host;
@@ -94,26 +127,7 @@
     var svg = el('svg', { viewBox: (-w / 2) + ' ' + (-h / 2) + ' ' + w + ' ' + h, class: 'board-svg', role: 'img', 'aria-label': 'YAJA hex board' });
     wrap.appendChild(svg);
     this.svg = svg;
-    var defs = el('defs', {}, svg);
-    defs.innerHTML = [
-      // Gem skin
-      '<radialGradient id="gem-1" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#d9f2ff"/><stop offset=".35" stop-color="#3ab0ff"/><stop offset="1" stop-color="#0b3a73"/></radialGradient>',
-      '<radialGradient id="gem-2" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffe0e6"/><stop offset=".35" stop-color="#ff3b5c"/><stop offset="1" stop-color="#6b0a1d"/></radialGradient>',
-      // Neon
-      '<radialGradient id="neon-1" cx=".5" cy=".5" r=".5"><stop offset=".55" stop-color="#021a2e"/><stop offset=".8" stop-color="#3ab0ff"/><stop offset="1" stop-color="#b6e6ff"/></radialGradient>',
-      '<radialGradient id="neon-2" cx=".5" cy=".5" r=".5"><stop offset=".55" stop-color="#2e0210"/><stop offset=".8" stop-color="#ff3b5c"/><stop offset="1" stop-color="#ffc2cd"/></radialGradient>',
-      // Glass
-      '<linearGradient id="glass-1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9bd8ff" stop-opacity=".95"/><stop offset=".5" stop-color="#1b5d9c" stop-opacity=".85"/><stop offset="1" stop-color="#031a33"/></linearGradient>',
-      '<linearGradient id="glass-2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb3c0" stop-opacity=".95"/><stop offset=".5" stop-color="#9c1b34" stop-opacity=".85"/><stop offset="1" stop-color="#33030d"/></linearGradient>',
-      // Gold
-      '<radialGradient id="gold-1" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="#fff6d8"/><stop offset=".3" stop-color="#64c3ff"/><stop offset=".85" stop-color="#0d3f78"/><stop offset="1" stop-color="#c8aa6e"/></radialGradient>',
-      '<radialGradient id="gold-2" cx=".4" cy=".3" r=".8"><stop offset="0" stop-color="#fff6d8"/><stop offset=".3" stop-color="#ff6680"/><stop offset=".85" stop-color="#78102a"/><stop offset="1" stop-color="#c8aa6e"/></radialGradient>',
-      // Plasma
-      '<radialGradient id="plasma-1" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff"/><stop offset=".25" stop-color="#8fe3ff"/><stop offset=".7" stop-color="#1a6fff"/><stop offset="1" stop-color="#1a6fff" stop-opacity=".2"/></radialGradient>',
-      '<radialGradient id="plasma-2" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff"/><stop offset=".25" stop-color="#ffb0c0"/><stop offset=".7" stop-color="#ff1f4b"/><stop offset="1" stop-color="#ff1f4b" stop-opacity=".2"/></radialGradient>',
-      '<radialGradient id="tile-g" cx=".5" cy=".35" r=".75"><stop offset="0" stop-color="var(--tile-hi)"/><stop offset="1" stop-color="var(--tile-lo)"/></radialGradient>',
-      '<filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
-    ].join('');
+    ensureDefs();
 
     // Rim glow under the board
     el('polygon', { points: Art.hexPts(0, 0, S * SQ3 * 4.9, 0), class: 'board-rim' }, svg);
@@ -127,7 +141,7 @@
       var t = el('g', { class: 'cell', transform: 'translate(' + p.x.toFixed(2) + ',' + p.y.toFixed(2) + ')', 'data-i': i }, this.gTiles);
       el('polygon', { points: Art.hexPts(0, 0, S - 1.6, 30), class: 'tile' }, t);
       if (E.CORNERS.indexOf(i) !== -1) t.classList.add('corner');
-      var hint = el('circle', { r: 4.2, class: 'hint' }, t);
+      var hint = el('circle', { r: 6, class: 'hint' }, t);
       this.tiles.push(t); this.hints.push(hint);
       var sg = el('g', { class: 'stone', transform: 'translate(' + p.x.toFixed(2) + ',' + p.y.toFixed(2) + ')' }, this.gStones);
       var fl = el('g', { class: 'flipper' }, sg);
@@ -229,6 +243,7 @@
   // Interaction
   BoardView.prototype.setInteractive = function (on, side, mode) {
     this.interactive = on; this.side = side || this.side; this.mode = on ? (mode || 'place') : null;
+    this.svg.style.setProperty('--flipc', this.side === 1 ? '#7fd0ff' : '#ff7d93');
     this.svg.classList.toggle('interactive', on);
     this.svg.classList.toggle('ult-mode', on && this.mode === 'ult');
     this.refreshHints();
@@ -392,6 +407,7 @@
   };
 
   Y.BoardView = BoardView;
+  Y.ensureDefs = ensureDefs;
   Y.FX = FX;
   Y.boardPos = pos;
 })(window);

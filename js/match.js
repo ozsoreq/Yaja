@@ -93,6 +93,8 @@
     $('advFill').style.background = 'linear-gradient(90deg, ' + (left === 1 ? '#0b3a73, #3ab0ff' : '#6b0a1d, #ff3b5c') + ')';
     $('advBar').style.background = right === 1 ? '#0b3a73' : '#6b0a1d';
     $('callout').innerHTML = '';
+    $('coach').className = 'coach'; $('coach').innerHTML = '';
+    $('coach').onclick = function () { this.classList.remove('show'); };
     this.updateHud();
   };
 
@@ -115,7 +117,9 @@
       if (p === self.me && ready && can && !self.announcedReady) { self.announcedReady = true; sfx('ultReady'); }
       if (p === self.me && !ready) self.announcedReady = false;
     });
-    var adv = AI.advantage(s, this.me);
+    // Blend the engine's view with the actual score so the bar never contradicts the scoreboard.
+    var diff = sc[this.me] - sc[3 - this.me];
+    var adv = s.over ? AI.advantage(s, this.me) : 0.55 * Math.tanh(diff / 8) + 0.45 * AI.advantage(s, this.me);
     $('advFill').style.width = (50 + adv * 50).toFixed(1) + '%';
     var pt = $('phaseTag'), empties = E.emptyCount(s);
     if (E.finalPhase(s)) { pt.className = 'phase-tag final'; pt.textContent = 'Final phase · ' + empties; }
@@ -145,6 +149,8 @@
     if (s.over) return this.finish();
     var p = s.turn, kind = this.P[p].kind;
     var banner = $('turnBanner');
+    $('boardHost').style.setProperty('--turnc', sideColor(p));
+    $('boardHost').classList.toggle('my-turn', kind === 'human');
     if (E.finalPhase(s) && !this.finalAnnounced) {
       this.finalAnnounced = true;
       this.callout('FINAL PHASE', 'Ultimates are sealed', '#ff8a3d');
@@ -170,6 +176,14 @@
       }
       this.board.setInteractive(true, p, 'place');
       this.startClock(p, tk);
+      if (this.o.coach) {
+        var ch = E.CHAMPIONS[s.champ[p]];
+        if (E.canUlt(s, p)) this.coach('ult', 'Your <b>Ultimate</b> is charged! Press <kbd>R</kbd> or click ' + ch.ult + ', then choose a target. ' + ch.desc);
+        else if (E.finalPhase(s)) this.coach('final', '<b>Final phase</b>: Ultimates are sealed. Every stone counts now, so look for big multi-line flips.');
+        else if (E.CORNERS.some(function (c) { return places.indexOf(c) !== -1; })) this.coach('corner', 'A <b>corner</b> is available (gold-rimmed hex). Corners can never be flipped back. Grab it!');
+        else if (this.history.length >= 6) this.coach('runes', 'Golden <b>Runes</b>: claim one for +3 charge; each Rune you hold gives +1 charge every turn and +3 points at the end.');
+        else this.coach('start', 'Glowing dots are your legal moves. <b>Hover</b> one to preview: stones outlined in your colour will flip. You must trap at least one enemy line.');
+      }
     } else if (kind === 'bot') {
       banner.innerHTML = esc(this.P[p].name) + ' is thinking<span class="loading-dots"></span>';
       this.startClock(p, tk);
@@ -240,7 +254,15 @@
       return;
     }
     var ch = E.CHAMPIONS[s.champ[this.me]];
-    if (ch.target === 'none') { this.submit({ type: 'ult', cell: -1 }); return; }
+    if (ch.target === 'none') {
+      // Rewind has no target, so ask for a second press to avoid accidental casts.
+      if (this.armed) { this.submit({ type: 'ult', cell: -1 }); return; }
+      this.armed = true;
+      this.sideEl[this.me].querySelector('.ult').classList.add('armed');
+      $('turnBanner').innerHTML = '<b>' + ch.ult + '</b>: press <kbd>R</kbd> or click again to erase their last move (Esc to cancel)';
+      sfx('click');
+      return;
+    }
     this.armed = !this.armed;
     var u = this.sideEl[this.me].querySelector('.ult');
     u.classList.toggle('armed', this.armed);
@@ -248,12 +270,19 @@
     $('turnBanner').innerHTML = this.armed ? '<b>' + ch.ult + '</b> — choose a target (Esc to cancel)' : '<b>Your move</b>';
     sfx('click');
   };
+  Match.prototype.cancelUlt = function () {
+    this.armed = false;
+    this.sideEl[this.me].querySelector('.ult').classList.remove('armed');
+    var s = this.state;
+    this.board.setInteractive(true, this.me, E.legalPlacements(s, this.me).length ? 'place' : null);
+    $('turnBanner').innerHTML = '<b>Your move</b>';
+  };
   Match.prototype.bindKeys = function () {
     var self = this;
     this.keyHandler = function (e) {
       if (e.target && /input|textarea/i.test(e.target.tagName)) return;
       if (e.key === 'r' || e.key === 'R' || e.key === 'q' || e.key === 'Q') self.toggleUlt();
-      if (e.key === 'Escape' && self.armed) self.toggleUlt();
+      if (e.key === 'Escape' && self.armed) self.cancelUlt();
     };
     document.addEventListener('keydown', this.keyHandler);
   };
@@ -319,15 +348,37 @@
     return wait(this.fast ? 450 : 750);
   };
 
+  // Callouts queue up so a RUNE CLAIMED never wipes a TRIPLE.
   Match.prototype.callout = function (text, sub, color, big) {
-    var c = $('callout');
+    this.callQ = this.callQ || [];
+    if (this.callQ.length >= 3) this.callQ.shift();
+    this.callQ.push({ text: text, sub: sub, color: color, big: big });
+    if (!this.calling) this.nextCallout();
+  };
+  Match.prototype.nextCallout = function () {
+    var self = this, c = $('callout'), it = this.callQ.shift();
+    if (!it) { this.calling = false; return; }
+    this.calling = true;
     var d = document.createElement('div');
-    d.style.setProperty('--cc', color || '#3ab0ff');
-    d.innerHTML = '<div class="ct"' + (big ? ' style="font-size:clamp(44px,9vw,110px)"' : '') + '>' + esc(text) + '</div>' + (sub ? '<div class="cs">' + esc(sub) + '</div>' : '');
+    d.style.setProperty('--cc', it.color || '#3ab0ff');
+    d.innerHTML = '<div class="ct' + (it.big ? ' big' : '') + '">' + esc(it.text) + '</div>' + (it.sub ? '<div class="cs">' + esc(it.sub) + '</div>' : '');
     c.innerHTML = '';
     c.appendChild(d);
-    clearTimeout(this.calloutT);
-    this.calloutT = setTimeout(function () { if (d.parentNode) d.remove(); }, 1400);
+    setTimeout(function () { if (d.parentNode) d.remove(); }, 1400);
+    setTimeout(function () { self.nextCallout(); }, this.callQ.length ? 950 : 1000);
+  };
+
+  // Coach tips for the training match.
+  Match.prototype.coach = function (key, html) {
+    if (!this.o.coach) return;
+    this.coached = this.coached || {};
+    if (this.coached[key]) return;
+    this.coached[key] = true;
+    var el = $('coach');
+    el.innerHTML = '<span class="coach-tag">Coach</span>' + html;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(this.coachT);
+    this.coachT = setTimeout(function () { el.classList.remove('show'); }, 11000);
   };
 
   Match.prototype.toast = function (t) { if (this.o.toast) this.o.toast(t); };

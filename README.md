@@ -52,8 +52,10 @@ Costs were tuned with thousands of bot-vs-bot games (`npm run sim`). The target 
 - **Ascension match:** reaching 100 LP in division I unlocks one tier-up match. Win it to promote. Lose it and you take a normal loss; there's no series to reset. (Riot dropped Bo3 promos, and so did we.)
 - **Safety nets:** a loss that would take you below 0 LP only drops you to 0. You're demoted on the next loss at 0 LP. New tiers come with a 3-game demotion shield.
 - **Hot streak:** +2 LP per win while you're on a 3+ win streak.
-- **Splits:** two-week seasons computed from the calendar, then a soft MMR reset, 3 re-placement games, and your peak rank saved to your profile.
-- **Loop:** champion mastery (M1–M7), 3 daily quests (one reroll per day), First Win of the Day, Essence to spend on stone skins, arenas and titles, a daily puzzle (the same position for everyone, with a Wordle-style shareable result), and a post-game engine review that tags your moves Brilliant/Best/Mistake/Blunder and gives an accuracy score.
+- **Splits:** four-week seasons computed from the calendar. At split end your peak rank earns Essence and a tier-coloured ring around your icon, then comes a gentle soft reset (MMR pulled 25% toward Silver IV) and 3 re-placement games.
+- **Rivals:** a *Nemesis* (a rival who leads your head-to-head by 3) pays +5 revenge LP when you beat them. Ascension matches are guarded by a *Gatekeeper*: the nearest rival rated at or above you.
+- **Fair play:** closing the tab during a ranked match counts as a loss the next time you open the game.
+- **Loop:** champion mastery (M1–M7), 3 daily quests (one reroll per day), First Win of the Day, Essence to spend on stone skins, arenas and titles, a daily puzzle (the same position for everyone, with a Wordle-style shareable result), a guided training match with a coach for new players, a "≈N wins to next division" goal on the lobby and results screens, and a post-game engine review that tags your moves Brilliant/Best/Mistake/Blunder and gives an accuracy score.
 
 Progress is stored in `localStorage` in the player's browser.
 
@@ -86,4 +88,4 @@ tools/balance.js    balance simulator
 docs/DESIGN.md      design doc + review notes
 ```
 
-Keyboard: <kbd>R</kbd> or <kbd>Q</kbd> arms your Ultimate, and <kbd>Esc</kbd> cancels it.
+Keyboard: <kbd>R</kbd> or <kbd>Q</kbd> arms your Ultimate, and <kbd>Esc</kbd> cancels it. Mira's Rewind has no target, so it needs a second press to confirm. On touch screens, tap a hex to preview it and tap again to place.

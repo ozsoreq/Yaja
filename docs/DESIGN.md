@@ -65,7 +65,9 @@ This doc records the design as built, and how it changed through two review roun
 - **Placements:** 5 games, starting from Silver IV MMR. The first opponent is 250 MMR easier. Placement lands at MMR − 50, capped at Emerald IV.
 - **Promotions:** divisions promote at 100 LP, carrying LP over. The I → next tier step needs a single **Ascension match**; losing it is a normal loss.
 - **Demotion protection:** 0 LP absorbs one loss, the next loss demotes to 75 LP. There's a 3-game shield after promotion or placement, and a floor at Iron IV 0 LP.
-- **Splits:** two weeks, computed from a fixed epoch. At a new split, MMR is pulled halfway to Silver IV, you play 3 re-placement games, and your previous peak is stored.
+- **Splits:** four weeks, computed from a fixed epoch. At a new split you get a peak reward (Essence plus a tier ring on your avatar), MMR is pulled 25% toward Silver IV, and you play 3 re-placement games.
+- **Nemesis / Gatekeeper:** beat a rival who leads your head-to-head by 3 or more for +5 revenge LP. Ascension matches are played against the nearest rival rated at or above you.
+- **Abandon:** an unfinished ranked match is recorded as a loss on the next load.
 - **Opponents:** 20 named, openly-AI rivals with home ratings from 900 to 4200. Matchmaking picks among the 3 nearest (weighted 50/30/20) so you keep meeting the same rivals. The bot plays at the average of its rating and yours, never adjusted for your streak. Bot ratings move when you play them, so the ladder feels alive.
 - **Duels:** online games update a separate Duel Elo, not LP, because localStorage can be edited.
 
@@ -93,3 +95,28 @@ This doc records the design as built, and how it changed through two review roun
 - **Networking:** PeerJS (vendored) over WebRTC data channels. Private rooms use `yaja-v3-r-<CODE>`. Quick Match races for `yaja-v3-qm-<n>` slots, and a waiting host periodically probes lower slots. A 2 s heartbeat detects a dead peer after 10 s. Messages that arrive during the guest's connect handshake are buffered and replayed.
 - **Audio:** a tiny WebAudio synth; no audio files.
 - **Tests:** `node --test tests/*.test.js` covers the engine rules, every Ultimate, the rank math, and the placement/ascension/demotion paths.
+
+## Review round 2 (hands-on playtest) — what changed
+
+A second agent played the build in a real browser on desktop and phone. It also ran about 700 bot games in Node. Fixes applied:
+
+- **Rendering:** stones were drawn hollow on review, puzzle and collection boards after a game had been played. Every board duplicated the same gradient ids inside hidden screens. There is now one shared, always-rendered `<defs>` block.
+- **Board readability:**
+  - Legal-move dots are larger and pulse in your colour.
+  - Corners are gold-rimmed tiles.
+  - The flip preview outlines the affected stones in *your* colour instead of fading them, which used to read as "will vanish".
+  - The board rim takes the colour of the side to move.
+- **Advantage bar:** it could contradict the score. It is now labelled and blends the score difference with the engine's evaluation.
+- **Onboarding:** first-time players get a training match against Pebble with coach tips on the relaxed practice clock, instead of a 10-second ranked placement.
+- **Goals:** "≈N wins to X" appears on the lobby and results screens, along with quest progress and a rivals panel.
+- **Callouts:** they now queue instead of overwriting each other. Callout and ult-banner text sizes are clamped for phones.
+- **Phone layout:** scores on top, a bigger board, Ultimate buttons at the bottom within thumb reach, Surrender as an icon, a scroll hint on the nav, and champion select no longer hides Mira behind the Lock In button.
+- **AI strength:** the curve was steepened (more noise and blunders at the bottom, depth 5 plus a longer endgame at the top). A 400-rating gap now wins about 60–76% instead of 43–73%.
+- **Economy:** four-week splits with peak rewards, three more shop titles, and a split-peak avatar ring.
+- **Bugs:**
+  - Placement games showed "+0 LP".
+  - The re-placement count was wrong after a split reset.
+  - The topbar Essence count went stale.
+  - The review and puzzle boards overflowed their panels.
+  - Mira's Rewind fired on a single key press; it now needs a confirmation press.
+  - Refreshing the page dodged a ranked loss.

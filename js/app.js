@@ -37,7 +37,15 @@
       if (b.getAttribute('data-x') === 'ok') onOk();
     };
   }
-  function myAvatar(size) { return Art.avatar(P.avatar, size || 40); }
+  // Best peak from past splits earns a tier-coloured ring around your icon.
+  function myAvatar(size) {
+    var best = null;
+    (P.pastSeasons || []).forEach(function (x) { if (x.peak && (!best || R.rankMMR(x.peak) > R.rankMMR(best))) best = x.peak; });
+    var av = Art.avatar(P.avatar, size || 40);
+    if (!best) return av;
+    var c = R.TIERS[best.tier].glow;
+    return '<span class="peak-ring" title="Past peak: ' + R.rankName(best) + '" style="--pc:' + c + '">' + av + '</span>';
+  }
   function myTitle() { var t = R.SHOP.filter(function (x) { return x.id === P.equipped.title; })[0]; return t ? t.name : ''; }
   function tierColor(rank) { return rank ? R.TIERS[rank.tier].color : '#6c8dff'; }
   function tierGlow(rank) { return rank ? R.TIERS[rank.tier].glow : '#bff4ff'; }
@@ -51,7 +59,7 @@
     return d > 0 ? d + 'd ' + h + 'h' : h + 'h ' + m + 'm';
   }
   function rankLine(rank) {
-    if (!rank) return P.placementsLeft < R.PLACEMENTS ? 'Placements ' + (R.PLACEMENTS - P.placementsLeft) + '/' + R.PLACEMENTS : 'Unranked';
+    if (!rank) return P.placementsLeft < P.placementsTotal ? 'Placements ' + (P.placementsTotal - P.placementsLeft) + '/' + P.placementsTotal : 'Unranked';
     return R.rankLabel(rank);
   }
 
@@ -66,6 +74,7 @@
     document.querySelectorAll('#nav button').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-go') === name); });
     var inGame = name === 'game' || name === 'select' || name === 'vs';
     $('topbar').style.display = inGame ? 'none' : '';
+    if (!inGame) renderTopbar();
     if (RENDER[name]) RENDER[name]();
   }
   document.addEventListener('click', function (e) {
@@ -104,11 +113,11 @@
     el.style.setProperty('--tier-glow', tierGlow(r));
     var name = r ? R.rankName(r) : 'Unranked';
     var badges = '';
-    if (!r) badges += '<span class="badge place">Placements ' + (R.PLACEMENTS - P.placementsLeft) + ' / ' + R.PLACEMENTS + '</span>';
+    if (!r) badges += '<span class="badge place">Placements ' + (P.placementsTotal - P.placementsLeft) + ' / ' + P.placementsTotal + '</span>';
     if (P.ascension) badges += '<span class="badge asc">Ascension match next</span>';
     if (P.streak >= 3) badges += '<span class="badge fire">🔥 ' + P.streak + ' win streak</span>';
     if (P.promoShield > 0 && r) badges += '<span class="badge shield">Demotion shield · ' + P.promoShield + '</span>';
-    var lpPct = r ? (r.tier >= R.APEX ? Math.min(100, r.lp / 10) : r.lp) : (R.PLACEMENTS - P.placementsLeft) / R.PLACEMENTS * 100;
+    var lpPct = r ? (r.tier >= R.APEX ? Math.min(100, r.lp / 10) : r.lp) : (P.placementsTotal - P.placementsLeft) / P.placementsTotal * 100;
     el.innerHTML =
       '<div class="kicker">Split ' + season.n + ' · Ranked</div>' +
       '<div class="emblem-wrap">' + Art.emblem(r, 150) + '</div>' +
@@ -116,8 +125,21 @@
       '<div class="lp-line">' + (r ? r.lp + ' LP' : 'Play ' + P.placementsLeft + ' more to get ranked') + '</div>' +
       '<div class="lp-bar"><div class="fill" style="width:' + lpPct + '%"></div></div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:6px">' + badges + '</div></div>' +
+      '<div class="goal-line"><span class="goal-ic">➤</span>' + esc(R.nextGoal(P).text) + '</div>' +
       '<div class="rank-stats"><div><b>' + P.wins + '</b><span>Wins</span></div><div><b>' + P.losses + '</b><span>Losses</span></div><div><b>' + (P.games ? Math.round(100 * P.wins / P.games) : 0) + '%</b><span>Win rate</span></div></div>' +
+      rivalsHtml() +
       '<div class="season-line">Split ends in <b>' + fmtDur(season.msLeft) + '</b>' + (P.peak ? ' · Peak <b>' + esc(R.rankName(P.peak)) + '</b>' : '') + '</div>';
+  }
+
+  function rivalsHtml() {
+    var rows = R.BOTS.map(function (b) { return { b: b, r: R.botRating(P, b) }; })
+      .sort(function (a, b) { return Math.abs(a.r - P.mmr) - Math.abs(b.r - P.mmr); }).slice(0, 4)
+      .sort(function (a, b) { return b.r - a.r; });
+    return '<div class="rivals"><div class="section-label">Your rivals</div>' + rows.map(function (x) {
+      var h = P.h2h[x.b.id], nem = R.isNemesis(P, x.b.id);
+      return '<div class="rival-row">' + Art.botAvatar(x.b, 26) + '<span class="rn">' + esc(x.b.name) + (nem ? ' <span class="nem">NEMESIS</span>' : '') + '</span>' +
+        '<span class="muted">' + (h ? h.w + '–' + h.l : 'new') + '</span></div>';
+    }).join('') + '</div>';
   }
 
   function renderModes() {
@@ -130,7 +152,7 @@
       d.innerHTML = '<div class="section-label">Likely opponent</div><div class="next-opp">' + Art.botAvatar(o.bot, 44) +
         '<div class="who"><b>' + esc(o.bot.name) + ' <span class="muted" style="font-weight:400">· ' + esc(o.bot.tag) + '</span></b>' +
         '<span>' + R.rankName(o.displayRank) + ' · mains ' + E.CHAMPIONS[o.bot.main].name + (h ? ' · your record ' + h.w + '–' + h.l : ' · first meeting') + '</span></div>' +
-        '<span style="margin-left:auto" class="muted" title="Ranked opponents are AI rivals, openly.">AI rival</span></div>';
+        '<span style="margin-left:auto;text-align:right" class="muted" title="Ranked opponents are AI rivals, openly.">' + (o.gatekeeper ? '<span class="nem gate">GATEKEEPER</span><br>' : o.nemesis ? '<span class="nem">NEMESIS · +5 LP revenge</span><br>' : '') + 'AI rival</span></div>';
       $('playSub').textContent = P.ascension ? 'Win to ascend' : P.rank ? rankLine(P.rank) : 'Placement match';
       btn.querySelector('.play-label').textContent = P.ascension ? 'Ascend' : 'Find match';
     } else if (app.mode === 'practice') {
@@ -173,7 +195,7 @@
     var h = P.history.slice(0, 8);
     $('historyStrip').innerHTML = '<div class="section-label">Recent matches</div>' + (h.length ? h.map(function (m) {
       var cls = m.won ? 'w' : m.draw ? 'd' : 'l';
-      var lp = m.lp == null ? '<span class="muted">' + (m.mode === 'duel' ? 'Duel' : m.mode === 'practice' ? 'Practice' : '—') + '</span>'
+      var lp = m.lp == null ? '<span class="muted">' + (m.placement ? 'Placement' : m.mode === 'duel' ? 'Duel' : m.mode === 'practice' ? 'Practice' : '—') + '</span>'
         : '<span class="' + (m.lp >= 0 ? 'good' : 'bad') + '">' + (m.lp >= 0 ? '+' : '') + m.lp + ' LP</span>';
       return '<div class="hist-row ' + cls + '"><i class="bar"></i>' + Art.sigil(m.champ, 30) +
         '<div><span class="res">' + (m.won ? 'Victory' : m.draw ? 'Draw' : 'Defeat') + '</span> <span class="muted">vs ' + esc(m.opp) + ' (' + E.CHAMPIONS[m.oppChamp].name + ')</span></div>' +
@@ -221,6 +243,11 @@
     var t = setTimeout(function () { if (!done) { done = true; overlay('queueOverlay', null); toast('Match declined (no response).'); onDecline(); } }, 10000);
     $('acceptBtn').onclick = function () { if (done) return; done = true; clearTimeout(t); sfx('click'); $('acceptBtn').textContent = 'Accepted'; setTimeout(function () { overlay('queueOverlay', null); onAccept(); }, 500); };
     $('declineBtn').onclick = function () { if (done) return; done = true; clearTimeout(t); overlay('queueOverlay', null); onDecline(); };
+  }
+
+  function startTutorial() {
+    var bot = R.BOTS[0];
+    startSelect({ kind: 'practice', tutorial: true, opp: { bot: bot, rating: 800, displayRank: R.rankFromMMR(800) } });
   }
 
   function startPractice() {
@@ -312,7 +339,7 @@
     $('vsBox').innerHTML =
       '<div class="vs-side l" style="color:' + (mySide === 1 ? me.color : op.color) + '">' + sideHtml(mySide === 1) + '</div>' +
       '<div class="vs-side r" style="color:' + (mySide === 1 ? op.color : me.color) + '">' + sideHtml(mySide !== 1) + '</div>' +
-      '<div class="vs-mid">VS</div><div class="vs-foot" id="vsFoot">Loading the arena<span class="loading-dots"></span></div>';
+      '<div class="vs-mid">VS</div><div class="vs-foot" id="vsFoot">' + (ctx.opp.gatekeeper ? '<b class="nem gate">GATEKEEPER</b> Defeat ' + esc(oppName) + ' to ascend' : ctx.opp.nemesis ? '<b class="nem">NEMESIS</b> Beat ' + esc(oppName) + ' for +5 revenge LP' : ctx.tutorial ? 'Training match · the coach is watching' : 'Loading the arena<span class="loading-dots"></span>') + '</div>';
     function sideHtml(isMe) {
       var c = isMe ? me : op;
       return '<div class="big-sig">' + Art.sigil(c.id, 180) + '</div><div class="vc">' + c.name + ' · ' + c.role + '</div>' +
@@ -338,13 +365,13 @@
       first = Math.random() < 0.5 ? 1 : 2; runeLayout = Math.floor(Math.random() * E.RUNE_LAYOUTS.length);
       var bot = ctx.opp.bot;
       players[1] = { name: P.name, avatarHtml: myAvatar(40), rankHtml: ctx.kind === 'ranked' ? Art.emblem(P.rank, 18, { div: false }) + esc(rankLine(P.rank)) : 'Practice', champ: myChamp, kind: 'human' };
-      players[2] = { name: bot.name, avatarHtml: Art.botAvatar(bot, 40), rankHtml: (ctx.kind === 'ranked' ? Art.emblem(ctx.opp.displayRank, 18, { div: false }) + R.rankName(ctx.opp.displayRank) : PRACTICE[app.practiceLevel].name) + ' · AI',
+      players[2] = { name: bot.name, avatarHtml: Art.botAvatar(bot, 40), rankHtml: (ctx.kind === 'ranked' ? Art.emblem(ctx.opp.displayRank, 18, { div: false }) + R.rankName(ctx.opp.displayRank) : ctx.tutorial ? 'Training' : PRACTICE[app.practiceLevel].name) + ' · AI',
         champ: oppChamp, kind: 'bot', bot: bot, botProfile: AI.profileFor(ctx.opp.rating, bot.style) };
     }
     var m = new Y.Match({
       mode: ctx.kind, mySide: mySide, players: players, first: first, runeLayout: runeLayout,
       channel: ctx.kind === 'duel' && app.online ? app.online.ch : null,
-      skin: P.equipped.skin, boardTheme: P.equipped.board, fast: P.settings.fast,
+      skin: P.equipped.skin, boardTheme: P.equipped.board, fast: P.settings.fast, coach: !!ctx.tutorial,
       toast: toast,
       confirmResign: function (ok) { confirmBox('Surrender?', 'You will lose this match' + (ctx.kind === 'ranked' ? ' and the LP that comes with it.' : '.'), 'Surrender', ok, 'Keep playing'); },
       onRemoteAfk: function () { toast('Opponent stopped responding.'); m.forfeit(3 - mySide); },
@@ -353,6 +380,10 @@
     });
     app.match = m;
     app.ctx = ctx;
+    if (ctx.kind === 'ranked') {
+      P.activeMatch = { champ: myChamp, oppChamp: oppChamp, oppName: ctx.opp.bot.name, oppId: ctx.opp.bot.id, oppRating: ctx.opp.rating, t: Date.now() };
+      R.save(P);
+    }
     m.start();
   }
 
@@ -363,8 +394,9 @@
       oppId: ctx.kind === 'ranked' ? ctx.opp.bot.id : null,
       oppRating: ctx.kind === 'duel' ? ctx.opp.duel : ctx.opp.rating,
       score: s.score, bestMove: s.bestMove, maxLines: s.maxLines, runesEnd: s.runesEnd, ults: s.ults,
-      cornersEnd: s.cornersEnd, margin: s.margin, flipped: s.flipped
+      cornersEnd: s.cornersEnd, margin: s.margin, flipped: s.flipped, nemesis: !!ctx.opp.nemesis
     };
+    if (ctx.tutorial) { P.tutorialDone = true; }
     var out = R.recordMatch(P, mm);
     app.lastGame = { ctx: ctx, summary: s, out: out, history: m.history, final: s.state, me: s.me, players: m.P };
     app.nextOpp = null;
@@ -383,8 +415,8 @@
     var rk = out.ranked, lpHtml = '';
     if (rk) {
       if (!rk.after && !rk.before) {
-        var done = R.PLACEMENTS - P.placementsLeft;
-        lpHtml = '<div class="lp-block"><div>' + Art.emblem(null, 64) + '</div><div><div class="lpn">Placements</div><div class="muted">' + done + ' of ' + R.PLACEMENTS + ' played</div>' +
+        var done = P.placementsTotal - P.placementsLeft;
+        lpHtml = '<div class="lp-block"><div>' + Art.emblem(null, 64) + '</div><div><div class="lpn">Placements</div><div class="muted">' + done + ' of ' + P.placementsTotal + ' played</div>' +
           '<div style="display:flex;gap:6px;margin-top:8px">' + placementDots() + '</div></div><div class="lpd muted">—</div></div>';
       } else {
         var start = rk.before || rk.after;
@@ -402,11 +434,14 @@
       }
     }
     if (out.duelDelta != null) lpHtml = '<div class="lp-block"><div>' + myAvatar(56) + '</div><div><div class="lpn">Duel rating</div><div class="muted">' + P.duel.rating + '</div></div><div class="lpd ' + (out.duelDelta >= 0 ? 'good' : 'bad') + '">' + (out.duelDelta >= 0 ? '+' : '') + out.duelDelta + '</div></div>';
+    if (rk && rk.revenge) lpHtml += ' <div class="badge fire">Revenge on your nemesis +5 LP</div>';
+    if (ctx.kind === 'ranked' || ctx.tutorial) lpHtml += '<div class="goal-line center"><span class="goal-ic">➤</span>Next: ' + esc(R.nextGoal(P).text) + '</div>';
     var mast = out.mastery, mp = R.masteryProgress(mast.after);
     var rewards = out.rewards.map(function (r, i) { return '<div style="animation-delay:' + (0.8 + i * 0.15) + 's"><span>' + esc(r.label) + '</span><b class="qr"><span class="ess-icon"></span> +' + r.amount + '</b></div>'; }).join('') +
       '<div style="animation-delay:' + (0.8 + out.rewards.length * 0.15) + 's;border-left-color:' + E.CHAMPIONS[mast.champ].color + '"><span>' + E.CHAMPIONS[mast.champ].name + ' mastery +' + mast.gained + (mast.levelUp ? ' — <b style="color:var(--gold-hi)">Level ' + mp.level + '!</b>' : '') + '</span><span class="muted">M' + mp.level + (mp.next ? ' · ' + mp.next + ' to next' : ' · max') + '</span></div>' +
+      (out.quests || []).filter(function (q) { return !q.done; }).map(function (q) { return '<div style="animation-delay:1s;border-left-color:#bff4ff"><span>Quest: ' + esc(q.text) + '</span><b>' + q.progress + ' / ' + q.goal + '</b></div>'; }).join('') +
       (out.h2h ? '<div style="animation-delay:' + (0.9 + out.rewards.length * 0.15) + 's;border-left-color:var(--gold)"><span>Head-to-head vs ' + esc(ctx.opp.bot.name) + '</span><b>' + out.h2h.w + ' – ' + out.h2h.l + '</b></div>' : '');
-    var again = ctx.kind === 'duel' ? 'Rematch' : ctx.kind === 'practice' ? 'Play again' : (P.ascension ? 'Ascension match' : 'Queue again');
+    var again = ctx.tutorial ? 'Start placements' : ctx.kind === 'duel' ? 'Rematch' : ctx.kind === 'practice' ? 'Play again' : (P.ascension ? 'Ascension match' : 'Queue again');
     var o = overlay('resultOverlay', '<div class="dialog result ' + cls + '"><div class="rt">' + title + '</div><div class="rs">' + sub + '</div>' +
       '<div class="tally"><i class="a" id="tA"></i><i class="b" id="tB"></i></div>' +
       '<div class="tally-nums"><span class="' + (s.me === 1 ? 'a' : 'b') + '">' + s.score[0] + '</span><span class="' + (s.me === 1 ? 'b' : 'a') + '">' + s.score[1] + '</span></div>' +
@@ -424,7 +459,7 @@
     $('rReview').onclick = function () { closeResults(); go('review'); };
     $('rAgain').onclick = function () {
       closeResults();
-      if (ctx.kind === 'ranked') { go('home'); startRankedQueue(); }
+      if (ctx.kind === 'ranked' || ctx.tutorial) { go('home'); startRankedQueue(); }
       else if (ctx.kind === 'practice') startPractice();
       else requestRematch();
     };
@@ -435,7 +470,7 @@
   }
   function closeResults() { overlay('resultOverlay', null); if (app.match) { app.match.destroy(); app.match = null; } }
   function placementDots() {
-    var out = '', n = R.PLACEMENTS, h = P.history.filter(function (m) { return m.mode === 'ranked'; }).slice(0, n - P.placementsLeft).reverse();
+    var out = '', n = P.placementsTotal, h = P.history.filter(function (m) { return m.mode === 'ranked'; }).slice(0, n - P.placementsLeft).reverse();
     for (var i = 0; i < n; i++) {
       var m = h[i];
       out += '<i style="width:16px;height:16px;transform:rotate(45deg);display:inline-block;border:1px solid var(--line-strong);background:' + (m ? (m.won ? 'var(--azure)' : m.draw ? 'var(--muted)' : 'var(--crimson)') : 'transparent') + '"></i>';
@@ -936,8 +971,19 @@
   // Boot
   // ---------------------------------------------------------------------------------------------
   function boot() {
+    Y.ensureDefs();
+    // A ranked match that was abandoned (tab closed / refreshed) counts as a loss.
+    if (P.activeMatch) {
+      var am = P.activeMatch;
+      R.recordMatch(P, { mode: 'ranked', ranked: true, won: false, draw: false, champ: am.champ, oppChamp: am.oppChamp, oppName: am.oppName, oppId: am.oppId,
+        oppRating: am.oppRating, nemesis: false, score: [0, 0], bestMove: 0, maxLines: 0, runesEnd: 0, ults: 0, cornersEnd: 0, margin: 0, flipped: 0 });
+      P.notices.push('You left a ranked match against ' + esc(am.oppName) + '. It counted as a loss.');
+      R.save(P);
+    }
     renderTopbar();
     go('home');
+    (P.notices || []).forEach(function (n, i) { setTimeout(function () { toast(n); }, 600 + i * 900); });
+    P.notices = []; R.save(P);
     var q = new URLSearchParams(location.search);
     var room = q.get('room');
     if (room && Net.available()) {
@@ -948,12 +994,12 @@
       P.tutorialSeen = true; R.save(P);
       var o = overlay('modal', '<div class="dialog"><div class="kicker">Welcome, ' + esc(P.name) + '</div><h2>Hex. Flip. Climb.</h2>' +
         '<p>YAJA is a 3-minute duel on a hex board. Trap enemy lines to flip them, charge your champion’s Ultimate, and climb from Iron to Challenger.</p>' +
-        '<p class="muted">Your first 5 ranked games are placements. Hover any hex to preview what it captures.</p>' +
-        '<div class="actions"><button class="btn ghost" data-x="learn">Read the rules</button><button class="btn gold" data-x="play">Play first match</button></div></div>');
+        '<p class="muted">Start with a relaxed training match against Pebble. A coach will explain as you go, and nothing is on the line.</p>' +
+        '<div class="actions"><button class="btn ghost" data-x="learn">Read the rules</button><button class="btn gold" data-x="play">Start training</button></div></div>');
       o.onclick = function (e) {
         var b = e.target.closest('[data-x]'); if (!b) return;
         overlay('modal', null);
-        if (b.getAttribute('data-x') === 'learn') go('learn'); else startRankedQueue();
+        if (b.getAttribute('data-x') === 'learn') go('learn'); else startTutorial();
       };
     }
     // Refresh the split timer now and then.
