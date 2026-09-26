@@ -141,9 +141,17 @@
     el('path', { class: 'disc', d: this.discPath() }, this.ghost);
     this.gain = el('text', { class: 'gain-label', 'text-anchor': 'middle' }, this.gFx);
 
-    svg.addEventListener('pointermove', function (e) { self.onHover(self.cellFromEvent(e)); });
-    svg.addEventListener('pointerleave', function () { self.onHover(-1); });
-    svg.addEventListener('click', function (e) { var i = self.cellFromEvent(e); if (i >= 0) self.onClick(i); });
+    svg.addEventListener('pointerdown', function (e) { self.lastPointer = e.pointerType; });
+    svg.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse') self.onHover(self.cellFromEvent(e)); });
+    svg.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') self.onHover(-1); });
+    svg.addEventListener('click', function (e) {
+      var i = self.cellFromEvent(e); if (i < 0) return;
+      // Touch has no hover: first tap previews, second tap on the same hex confirms.
+      if (self.lastPointer === 'touch' || self.lastPointer === 'pen') {
+        if (self.interactive && self.legal.indexOf(i) !== -1 && self.hoverCell !== i) { self.onHover(i); Y.Audio.sfx('hover'); return; }
+      }
+      self.onClick(i);
+    });
     // Subtle 3D tilt toward the pointer.
     this.host.addEventListener('pointermove', function (e) {
       if (e.pointerType !== 'mouse') return;

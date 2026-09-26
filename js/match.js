@@ -152,7 +152,8 @@
     this.armed = false;
     this.board.setInteractive(false);
     if (kind === 'human') {
-      banner.innerHTML = '<b>Your move</b>' + (this.extraTurn ? ' · again!' : '');
+      var coarse = root.matchMedia && root.matchMedia('(pointer: coarse)').matches;
+      banner.innerHTML = '<b>Your move</b>' + (this.extraTurn ? ' · again!' : '') + (coarse && this.history.length < 6 ? ' · tap to preview, tap again to place' : '');
       sfx('turn');
       var places = E.legalPlacements(s, p);
       if (!places.length) {
